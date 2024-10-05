@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+// ignore: depend_on_referenced_packages
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AddUser extends StatefulWidget {
@@ -37,12 +38,15 @@ class AddUserState extends State<AddUser> {
 
       try {
         await FirebaseFirestore.instance.collection('users').add(userData);
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('User added successfully!')),
         );
         _clearFields();
+        // ignore: use_build_context_synchronously
         Navigator.pop(context);
       } catch (e) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to add user: $e')),
         );

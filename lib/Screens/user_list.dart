@@ -1,4 +1,5 @@
 import 'package:aksar_mandir_gondal/Screens/add_user.dart';
+// ignore: depend_on_referenced_packages
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -145,6 +146,7 @@ class UserList extends StatelessWidget {
               child: const Text('Delete', style: TextStyle(color: Colors.red)),
               onPressed: () async {
                 await FirebaseFirestore.instance.collection('users').doc(documentId).delete();
+                // ignore: use_build_context_synchronously
                 Navigator.of(context).pop(); // Close the dialog
               },
             ),

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:aksar_mandir_gondal/Screens/login_screen.dart';
+import 'package:aksar_mandir_gondal/Screens/initial_screen.dart';
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -16,7 +16,7 @@ class SplashScreenState extends State<SplashScreen> {
     super.initState();
     Timer(const Duration(seconds: 2), () {
       Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const LoginScreen()));
+          MaterialPageRoute(builder: (context) => const InitialScreen()));
     });
   }
 

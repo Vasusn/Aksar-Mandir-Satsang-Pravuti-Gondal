@@ -3,6 +3,7 @@ import 'package:aksar_mandir_gondal/Screens/user_list.dart';
 import 'package:flutter/material.dart';
 // ignore: depend_on_referenced_packages
 import 'package:firebase_auth/firebase_auth.dart';
+// ignore: depend_on_referenced_packages
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }).toList();
       });
     } catch (e) {
+      // ignore: avoid_print
       print('Error fetching users: $e');
     }
   }
