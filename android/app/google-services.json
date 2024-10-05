@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "150434731216",
+    "project_id": "aksar-mandir-satsang-pra-b2104",
+    "storage_bucket": "aksar-mandir-satsang-pra-b2104.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:150434731216:android:4513b0814b8ce609267ad5",
+        "android_client_info": {
+          "package_name": "com.example.aksa"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCHTB7TqWbE0s46NLPdWwdtj1Md8iiJcxY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
