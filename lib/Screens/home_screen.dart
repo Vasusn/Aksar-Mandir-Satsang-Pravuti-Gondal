@@ -1,9 +1,10 @@
+// ignore_for_file: depend_on_referenced_packages, use_build_context_synchronously
+
 import 'package:aksar_mandir_gondal/Screens/login_screen.dart';
 import 'package:aksar_mandir_gondal/Screens/user_list.dart';
 import 'package:flutter/material.dart';
-// ignore: depend_on_referenced_packages
+import 'package:intl/intl.dart'; // Import for date formatting
 import 'package:firebase_auth/firebase_auth.dart';
-// ignore: depend_on_referenced_packages
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -14,32 +15,139 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<Map<String, String>> users = []; // Initialize an empty list to store users
+  List<Map<String, dynamic>> usersData = [];
+  List<Map<String, dynamic>> allUsersData = [];
+  DateTime _selectedDate = DateTime.now();
+  DateTime _today = DateTime.now();
+  bool attendanceExists = false; // Track if attendance exists for the selected date
+
+  // Fetch all users and attendance for the selected date
+  Future<void> _checkAttendance() async {
+    String formattedDate = DateFormat('EEEE, MMM d').format(_selectedDate);
+    try {
+      QuerySnapshot attendanceSnapshot = await FirebaseFirestore.instance
+          .collection('attendance')
+          .where('date', isEqualTo: formattedDate)
+          .get();
+
+      if (attendanceSnapshot.docs.isNotEmpty) {
+        // Attendance found for the selected date
+        DocumentSnapshot attendanceDoc = attendanceSnapshot.docs.first;
+        setState(() {
+          usersData = List<Map<String, dynamic>>.from(attendanceDoc['users']);
+          attendanceExists = true;
+        });
+      } else {
+        // No attendance found for the selected date, load all users as absent
+        setState(() {
+          usersData = [];
+          attendanceExists = false;
+        });
+        await _fetchUsers(); // Fetch users and mark them all absent
+      }
+    } catch (e) {
+      print('Error fetching attendance: $e');
+    }
+  }
+
+  // Fetch all users from the 'users' collection
+  Future<void> _fetchUsers() async {
+    try {
+      QuerySnapshot userSnapshot =
+          await FirebaseFirestore.instance.collection('users').get();
+      final fetchedUsers = userSnapshot.docs.map((doc) {
+        return {
+          'id': doc['id'],
+          'name': doc['name'],
+          'mobile_number': doc['mobile_number'],
+          'present': false, // Default to absent (false)
+        };
+      }).toList();
+
+      setState(() {
+        usersData = fetchedUsers;      // Display fetched users
+        allUsersData = fetchedUsers;   // Store fetched users for later
+      });
+    } catch (e) {
+      print('Error fetching users: $e');
+    }
+  }
+
+  // Toggle present status in the UI for a user
+  void _togglePresentStatus(int index) {
+    setState(() {
+      usersData[index]['present'] = !usersData[index]['present'];
+    });
+  }
+
+  // Save attendance data for the selected date
+  Future<void> _saveAttendance(BuildContext context) async {
+    String formattedDate = DateFormat('EEEE, MMM d').format(_selectedDate);
+    try {
+      QuerySnapshot existingAttendance = await FirebaseFirestore.instance
+          .collection('attendance')
+          .where('date', isEqualTo: formattedDate)
+          .get();
+
+      if (existingAttendance.docs.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Attendance for this date already exists!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Add new attendance data for the selected date
+      await FirebaseFirestore.instance.collection('attendance').add({
+        'date': formattedDate,
+        'users': usersData,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Attendance saved successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      print('Error saving attendance: $e');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _fetchUsers(); // Fetch users when the screen is initialized
+    _selectedDate = _findNextSunday(_selectedDate); // Start with nearest Sunday
+    _today = _findNextSunday(_today); // Align today with the nearest Sunday
+    _checkAttendance(); // Check attendance when the screen loads
   }
 
-  Future<void> _fetchUsers() async {
-    try {
-      final QuerySnapshot snapshot =
-          await FirebaseFirestore.instance.collection('users').get();
+  // Function to find the next Sunday from a given date
+  DateTime _findNextSunday(DateTime date) {
+    while (date.weekday != DateTime.sunday) {
+      date = date.add(const Duration(days: 1));
+    }
+    return date;
+  }
+
+  // Navigate to the previous Sunday
+  void _goToPreviousSunday() {
+    setState(() {
+      _selectedDate = _selectedDate.subtract(const Duration(days: 7));
+      _checkAttendance(); // Check attendance for new selected date
+    });
+  }
+
+  // Navigate to the next Sunday if it's not a future date
+  void _goToNextSunday() {
+    if (_selectedDate.add(const Duration(days: 7)).isBefore(_today) ||
+        _selectedDate.add(const Duration(days: 7)).isAtSameMomentAs(_today)) {
       setState(() {
-        users = snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return {
-            "fullName": data['name']?.toString() ?? 'N/A',  // Convert to String
-            "contactNumber": data['mobile_number']?.toString() ?? 'N/A', // Convert to String
-            "userId": data['id']?.toString() ?? 'N/A', // Convert to String
-            "present": data['present']?.toString() ?? 'false', // Ensure this is a string
-          };
-        }).toList();
+        _selectedDate = _selectedDate.add(const Duration(days: 7));
+        _checkAttendance(); // Check attendance for new selected date
       });
-    } catch (e) {
-      // ignore: avoid_print
-      print('Error fetching users: $e');
     }
   }
 
@@ -51,323 +159,245 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         title: const Text(
           "Aksar Mandir Satsang Pravuti",
-          style: TextStyle(
-            fontSize: 22,
-            fontFamily: 'regularFont',
-          ),
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
+          style: TextStyle(fontSize: 22, fontFamily: 'regularFont'),
         ),
       ),
-      drawer: Drawer(
-        child: Container(
-          color: const Color(0xFFB32412), // Color for the Drawer background
-          child: Column(
-            children: [
-              const DrawerHeader(
-                decoration: BoxDecoration(
-                  color: Colors.transparent, // Keep it transparent
-                ),
-                child: Center(
-                  child: Text(
-                    "Aksar Mandir\nSatsang Pravuti",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  color: Colors.white, // Set the background color to white
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: const Icon(
-                          Icons.group,
-                          color: Color(0xFFB32412), // Change icon color for visibility
-                          size: 29,
-                        ),
-                        title: const Text(
-                          "User",
-                          style: TextStyle(fontSize: 18),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const UserList(),
-                            ),
-                          );
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(
-                          Icons.logout,
-                          color: Color(0xFFB32412), // Change icon color for visibility
-                          size: 29,
-                        ),
-                        title: const Text(
-                          "Logout",
-                          style: TextStyle(fontSize: 18),
-                        ),
-                        onTap: () async {
-                          await FirebaseAuth.instance.signOut(); // Sign out the user
-                          Navigator.pushReplacement(
-                            // ignore: use_build_context_synchronously
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LoginScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      ListTile(
-                        leading: const Icon(
-                          Icons.info,
-                          color: Color(0xFFB32412), // Change icon color for visibility
-                          size: 29,
-                        ),
-                        title: const Text(
-                          "Developed by",
-                          style: TextStyle(fontSize: 18),
-                        ),
-                        onTap: () {
-                          Navigator.pop(context); // Close the drawer first
-                          showDialog(
-                            context: context,
-                            builder: (BuildContext context) {
-                              return AlertDialog(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20.0),
-                                ),
-                                title: const Text(
-                                  "Developed by",
-                                  style: TextStyle(
-                                    fontFamily: 'boldFont',
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold, // Bold for emphasis
-                                  ),
-                                ),
-                                content: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      RichText(
-                                        text: const TextSpan(
-                                          children: [
-                                            TextSpan(
-                                              text: "This app was developed by\n",
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.black,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text: "Vasu Nageshri and Keval Thumar.",
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.black,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        textAlign: TextAlign.center, // Center align the text
-                                      ),
-                                      const SizedBox(height: 10),
-                                      RichText(
-                                        text: const TextSpan(
-                                          children: [
-                                            TextSpan(
-                                              text: "For any inquiries or further development requests,\n",
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.black,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text: "+91 7016457404 & +91 9913201462",
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.black,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        textAlign: TextAlign.center, // Center align the text
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    child: const Text(
-                                      "Close",
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                    onPressed: () {
-                                      Navigator.of(context).pop(); // Close the dialog
-                                    },
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      drawer: _buildDrawer(context),
       body: Column(
         children: [
-          // Date Row with Arrows
-          Container(
-            height: 100, // Increase container height
-            color: Colors.grey.shade300,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                // Left Icon (Much larger icon)
-                Container(
-                  alignment: Alignment.center,
-                  height: 150, // Increase the height to match the icon size
-                  // Set width as needed
-                  child: FittedBox(
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_left, color: Colors.red),
-                      iconSize: 200, // Increased icon size to 200
-                      onPressed: () {
-                        // Left arrow click action
-                      },
-                    ),
-                  ),
-                ),
-                // Date Text
-                const Text(
-                  "Sun, Sep 29",
-                  style: TextStyle(
-                      fontSize: 20, // Adjust text size as needed
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'regularFont'),
-                ),
-                // Right Icon (Much larger icon)
-                Container(
-                  alignment: Alignment.center,
-                  height: 150, // Increase the height to match the icon size
-                  // Set width as needed
-                  child: FittedBox(
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_right, color: Colors.black),
-                      iconSize: 200, // Increased icon size to 200
-                      onPressed: () {
-                        // Right arrow click action
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(
-            height: 10,
-          ),
-          // Search Bar
-          SizedBox(
-            height: 140,
-            child: Column(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(15.0),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: "Search by Mobile, Name, ID",
-                      contentPadding: EdgeInsets.all(8.0),
-                    ),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton(
-                      onPressed: () {
-                        // Search button action
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xffc41a00), // Red color
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text(
-                        "Search",
-                        style: TextStyle(fontSize: 18, color: Colors.white),
-                      ),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Clear button action
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xffc41a00), // Red color
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text(
-                        "Clear",
-                        style: TextStyle(fontSize: 18, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
+          _buildDateRow(), // The row that includes date and navigation buttons
           const SizedBox(height: 10),
-
-          // Displaying the user data in a ListView
+          _buildSearchBar(), // The search bar
           Expanded(
-            child: ListView.builder(
-              itemCount: users.length,
-              itemBuilder: (context, index) {
-                final user = users[index];
-                return ContactCard(
-                    name: user['fullName'] ?? 'N/A',
-                    contactNumber: user['contactNumber'] ?? 'N/A',
-                    userId: user['userId'] ?? 'N/A',
-                    present: bool.parse(user['present']!) , // Parse string to bool
-                  );
-              },
+            child: usersData.isEmpty
+                ? Center(
+                    child: attendanceExists
+                        ? const CircularProgressIndicator()
+                        : const Text(
+                            'No attendance found for this date.',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.red,
+                            ),
+                          ),
+                  )
+                : ListView.builder(
+                    itemCount: usersData.length,
+                    itemBuilder: (context, index) {
+                      final user = usersData[index];
+                      return ContactCard(
+                        name: user['name'],
+                        contactNumber: user['mobile_number'],
+                        userId: user['id'],
+                        present: user['present'],
+                        onTogglePresent: () => _togglePresentStatus(index),
+                      );
+                    },
+                  ),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xffc41a00),
+              padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 25),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
+            onPressed: () async {
+              await _saveAttendance(context); // Save attendance on button press
+            },
+            child: const Text(
+              "Save Attendance",
+              style: TextStyle(fontSize: 18, fontFamily: 'boldFont'),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateRow() {
+    return Container(
+      height: 100,
+      color: Colors.grey.shade300,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_left, color: Colors.red),
+            iconSize: 50,
+            onPressed: _goToPreviousSunday, // Go to previous Sunday
+          ),
+          Text(
+            DateFormat('EEEE, MMM d').format(_selectedDate),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'regularFont',
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.arrow_right,
+              color:
+                  (_selectedDate.add(const Duration(days: 7)).isAfter(_today))
+                      ? Colors.grey
+                      : Colors.red,
+            ),
+            iconSize: 50,
+            onPressed:
+                (_selectedDate.add(const Duration(days: 7)).isAfter(_today))
+                    ? null
+                    : _goToNextSunday, // Disable on future dates
           ),
         ],
       ),
     );
   }
-}
+
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Container(
+        color: const Color(0xFFB32412),
+        child: Column(
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(color: Colors.transparent),
+              child: Center(
+                child: Text(
+                  "Aksar Mandir\nSatsang Pravuti",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Container(
+                color: Colors.white,
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.group,
+                          color: Color(0xFFB32412), size: 29),
+                      title: const Text("User", style: TextStyle(fontSize: 18)),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const UserList()), // Placeholder for UserList screen
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.logout,
+                          color: Color(0xFFB32412), size: 29),
+                      title:
+                          const Text("Logout", style: TextStyle(fontSize: 18)),
+                      onTap: () async {
+                        await FirebaseAuth.instance.signOut();
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const LoginScreen()), // Placeholder for Login screen
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.info,
+                          color: Color(0xFFB32412), size: 29),
+                      title: const Text("Developed by",
+                          style: TextStyle(fontSize: 18)),
+                      onTap: () {
+                        Navigator.pop(context); // Close the drawer first
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20.0),
+                              ),
+                              title: const Text(
+                                "Developed by",
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'regularFont',
+                                ),
+                              ),
+                              content: const Text(
+                                "Vasu Nageshri and Keval Thumar",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'regularFont',
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  child: const Text("Close"),
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15.0),
+      child: TextField(
+        decoration: InputDecoration(
+          hintText: 'Search by name...',
+          prefixIcon: const Icon(Icons.search),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        onChanged: (query) {
+          setState(() {
+            if (query.isEmpty) {
+              // If the query is empty, show all users
+              usersData = List.from(allUsersData);
+            } else {
+              // Filter users based on the search query
+              usersData = allUsersData.where((user) {
+                return user['name'].toLowerCase().contains(query.toLowerCase());
+              }).toList();
+            }
+          });
+        },
+      ),
+    );
+  }}
 
 
-class ContactCard extends StatefulWidget {
+class ContactCard extends StatelessWidget {
   final String name;
   final String contactNumber;
   final String userId;
   final bool present;
+  final VoidCallback onTogglePresent;
+   // To update the document in Firestore
 
   const ContactCard({
     super.key,
@@ -375,46 +405,30 @@ class ContactCard extends StatefulWidget {
     required this.contactNumber,
     required this.userId,
     required this.present,
+    required this.onTogglePresent,
   });
 
-  @override
-  ContactCardState createState() => ContactCardState();
-}
-
-class ContactCardState extends State<ContactCard> {
-  // Boolean to track icon state
-  late bool isClicked;
-
-  @override
-  void initState() {
-    super.initState();
-    isClicked = widget.present; // Initialize with present value
-  }
+  // Toggle present status in Firestore
+  
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5),
-      child: Card(
-        child: ListTile(
-          title: Text(
-            widget.name,
-            style: const TextStyle(fontFamily: 'boldFont'),
-          ),
-          subtitle: Row(
-            children: [Text("${widget.userId} - ${widget.contactNumber}")],
-          ),
-          trailing: IconButton(
-            icon: Icon(
-              isClicked ? Icons.clear : Icons.done, // Change icon based on state
-              size: 30,
-              color: isClicked ? Colors.red : Colors.green,
-            ),
-            onPressed: () {
-              setState(() {
-                isClicked = !isClicked; // Toggle the state
-              });
-            },
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      elevation: 2,
+      child: ListTile(
+        title: Text(
+          name,
+          style: const TextStyle(fontFamily: 'boldFont'),
+        ),
+        subtitle: Row(
+          children: [Text("$userId - $contactNumber")],
+        ),
+        trailing: GestureDetector(
+          onTap: onTogglePresent,
+          child: Icon(
+            present ? Icons.check_circle : Icons.cancel,
+            color: present ? Colors.green : Colors.red,
           ),
         ),
       ),
