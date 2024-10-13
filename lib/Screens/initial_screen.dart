@@ -1,6 +1,7 @@
 import 'package:aksar_mandir_gondal/Screens/home_screen.dart';
 import 'package:aksar_mandir_gondal/Screens/login_screen.dart';
 import 'package:flutter/material.dart';
+// ignore: depend_on_referenced_packages
 import 'package:firebase_auth/firebase_auth.dart';
 
 class InitialScreen extends StatelessWidget {
