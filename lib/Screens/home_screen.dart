@@ -1,5 +1,6 @@
 // ignore_for_file: depend_on_referenced_packages, use_build_context_synchronously
 
+import 'package:aksar_mandir_gondal/Screens/download_user.dart';
 import 'package:aksar_mandir_gondal/Screens/login_screen.dart';
 import 'package:aksar_mandir_gondal/Screens/user_list.dart';
 import 'package:flutter/material.dart';
@@ -310,6 +311,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     ),
+                   ListTile(
+  leading: const Icon(Icons.download, color: Color(0xFFB32412), size: 29),
+  title: const Text("Download", style: TextStyle(fontSize: 18)),
+  onTap: () async {
+    await downloadAttendanceAsPdf(context); // Call the function to download PDF
+  },
+),
+
+
                     ListTile(
                       leading: const Icon(Icons.info,
                           color: Color(0xFFB32412), size: 29),
