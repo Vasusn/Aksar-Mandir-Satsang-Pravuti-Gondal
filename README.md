@@ -15,17 +15,4 @@ This project is a mobile application built with Flutter for the Aksar Mandir com
 - **Attendance Tracking**: Track attendance of devotees for various activities.
 - **Multi-Language Support**: Available in multiple languages for a broader reach.
 
-## Getting Started
 
-### Prerequisites
-
-Ensure you have Flutter installed on your machine. You can install it by following the official documentation:
-
-- [Flutter Installation Guide](https://docs.flutter.dev/get-started/install)
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/your-username/aksar-mandir-satsang-pravuti-gondal.git
