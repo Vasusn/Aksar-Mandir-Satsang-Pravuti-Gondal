@@ -3,10 +3,13 @@
 import 'package:aksar_mandir_gondal/Screens/download_user.dart';
 import 'package:aksar_mandir_gondal/Screens/login_screen.dart';
 import 'package:aksar_mandir_gondal/Screens/user_list.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // Import for date formatting
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> allUsersData = [];
   DateTime _selectedDate = DateTime.now();
   DateTime _today = DateTime.now();
-  bool attendanceExists = false; // Track if attendance exists for the selected date
+  // Track if attendance exists for the selected date
 
   // Fetch all users and attendance for the selected date
   Future<void> _checkAttendance() async {
@@ -36,13 +39,11 @@ class _HomeScreenState extends State<HomeScreen> {
         DocumentSnapshot attendanceDoc = attendanceSnapshot.docs.first;
         setState(() {
           usersData = List<Map<String, dynamic>>.from(attendanceDoc['users']);
-          attendanceExists = true;
         });
       } else {
         // No attendance found for the selected date, load all users as absent
         setState(() {
           usersData = [];
-          attendanceExists = false;
         });
         await _fetchUsers(); // Fetch users and mark them all absent
       }
@@ -66,8 +67,8 @@ class _HomeScreenState extends State<HomeScreen> {
       }).toList();
 
       setState(() {
-        usersData = fetchedUsers;      // Display fetched users
-        allUsersData = fetchedUsers;   // Store fetched users for later
+        usersData = fetchedUsers; // Display fetched users
+        allUsersData = fetchedUsers; // Store fetched users for later
       });
     } catch (e) {
       print('Error fetching users: $e');
@@ -121,14 +122,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _selectedDate = _findNextSunday(_selectedDate); // Start with nearest Sunday
+    print(_selectedDate);
     _today = _findNextSunday(_today); // Align today with the nearest Sunday
     _checkAttendance(); // Check attendance when the screen loads
   }
 
   // Function to find the next Sunday from a given date
   DateTime _findNextSunday(DateTime date) {
+    print(date);
     while (date.weekday != DateTime.sunday) {
-      date = date.add(const Duration(days: 1));
+      date = date.subtract(const Duration(days: 1));
     }
     return date;
   }
@@ -168,19 +171,12 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildDateRow(), // The row that includes date and navigation buttons
           const SizedBox(height: 10),
-          _buildSearchBar(), // The search bar
           Expanded(
             child: usersData.isEmpty
-                ? Center(
-                    child: attendanceExists
-                        ? const CircularProgressIndicator()
-                        : const Text(
-                            'No attendance found for this date.',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.red,
-                            ),
-                          ),
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xffc41a00),
+                    ),
                   )
                 : ListView.builder(
                     itemCount: usersData.length,
@@ -311,15 +307,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     ),
-                   ListTile(
-  leading: const Icon(Icons.download, color: Color(0xFFB32412), size: 29),
-  title: const Text("Download", style: TextStyle(fontSize: 18)),
-  onTap: () async {
-    await downloadAttendanceAsPdf(context); // Call the function to download PDF
-  },
-),
-
-
+                    ListTile(
+                      leading: const Icon(Icons.download,
+                          color: Color(0xFFB32412), size: 29),
+                      title: const Text("Download",
+                          style: TextStyle(fontSize: 18)),
+                      onTap: () async {
+                        await downloadAttendanceAsPdf(
+                            context); // Call the function to download PDF
+                      },
+                    ),
                     ListTile(
                       leading: const Icon(Icons.info,
                           color: Color(0xFFB32412), size: 29),
@@ -332,26 +329,67 @@ class _HomeScreenState extends State<HomeScreen> {
                           builder: (BuildContext context) {
                             return AlertDialog(
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20.0),
+                                borderRadius: BorderRadius.circular(25.0),
                               ),
-                              title: const Text(
-                                "Developed by",
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'regularFont',
+                              titlePadding: EdgeInsets.zero,
+                              title: Container(
+                                decoration: const BoxDecoration(
+                                  color: Color(
+                                      0xFFB32412), // Main color (deep red)
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(25.0),
+                                    topRight: Radius.circular(25.0),
+                                  ),
+                                ),
+                                padding: const EdgeInsets.all(20),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.developer_mode,
+                                        color: Colors.white,
+                                        size: 30), // Icon in white
+                                    SizedBox(width: 10),
+                                    Text(
+                                      "Developed by",
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white, // Text in white
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              content: const Text(
-                                "Vasu Nageshri and Keval Thumar",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontFamily: 'regularFont',
-                                ),
+                              // Black background for the rest of the dialog
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildContactInfo(
+                                    context: context,
+                                    name: "Vasu Nageshri",
+                                    phoneNumber: '+917016457404',
+                                  ),
+                                  const SizedBox(height: 15),
+                                  _buildContactInfo(
+                                    context: context,
+                                    name: "Keval Thumar",
+                                    phoneNumber: '+912410022222222222222222222229913201462',
+                                  ),
+                                ],
                               ),
                               actions: [
                                 TextButton(
-                                  child: const Text("Close"),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    backgroundColor: const Color(
+                                        0xFFB32412), // Main color for the button
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 10, horizontal: 20),
+                                  ),
+                                  child: const Text("Close",
+                                      style: TextStyle(fontSize: 16)),
                                   onPressed: () {
                                     Navigator.pop(context);
                                   },
@@ -360,6 +398,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             );
                           },
                         );
+
                       },
                     ),
                   ],
@@ -371,7 +410,93 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+  Widget _buildContactInfo(
+      {required BuildContext context,
+      required String name,
+      required String phoneNumber}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+      decoration: BoxDecoration(
+        color: const Color(0xFFB32412)
+            .withOpacity(0.2), // Lightened version of main color
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: const Color(0xFFB32412), width: 1.5), // Border in main color
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            name,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black, // White text for the name
+            ),
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  label: "Call",
+                  icon: Icons.phone,
+                  onTap: () async {
+                    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+                    if (await canLaunchUrl(phoneUri)) {
+                      await launchUrl(phoneUri);
+                    } else {
+                      throw 'Could not launch $phoneNumber';
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildActionButton(
+                  label: "Chat",
+                  icon: CupertinoIcons.chat_bubble_text,
+                  onTap: () async {
+                    final Uri whatsappUri = Uri.parse(
+                        'https://wa.me/$phoneNumber?text=Hi%20there!%20I%20have%20a%20project%20inquiry');
+                    if (await canLaunchUrl(whatsappUri)) {
+                      await launchUrl(whatsappUri);
+                    } else {
+                      throw 'Could not launch WhatsApp';
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
+  // Helper widget for action buttons (Call/WhatsApp)
+  Widget _buildActionButton({
+    required String label,
+    required IconData icon,
+    required Function() onTap,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFFB32412), // Button color
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      ),
+      icon: Icon(icon, size: 18, color: Colors.white), // Icon inside the button
+      label: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 14,
+          color: Colors.white, // Text color
+        ),
+      ),
+    );
+  }
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 15.0),
@@ -398,8 +523,8 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
     );
-  }}
-
+  }
+}
 
 class ContactCard extends StatelessWidget {
   final String name;
@@ -407,7 +532,7 @@ class ContactCard extends StatelessWidget {
   final String userId;
   final bool present;
   final VoidCallback onTogglePresent;
-   // To update the document in Firestore
+  // To update the document in Firestore
 
   const ContactCard({
     super.key,
@@ -419,7 +544,6 @@ class ContactCard extends StatelessWidget {
   });
 
   // Toggle present status in Firestore
-  
 
   @override
   Widget build(BuildContext context) {

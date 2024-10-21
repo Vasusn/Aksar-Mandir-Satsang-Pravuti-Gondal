@@ -72,11 +72,34 @@ class AddUserState extends State<AddUser> {
       initialDate: DateTime.now(),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            primaryColor: const Color(0xffc41a00), // Header background color
+            scaffoldBackgroundColor: Colors.white, // Background color
+            buttonTheme: const ButtonThemeData(
+              textTheme: ButtonTextTheme.primary, // Buttons color
+            ),
+            colorScheme: const ColorScheme.light(
+              background: Color(0xffc41a00),
+              primary: Color(0xffc41a00), // Selected dates and buttons
+              onPrimary: Colors
+                  .white, // Text color on primary color (e.g., header text)
+              onSurface: Colors.black, // Dates text color
+            ),
+            dialogBackgroundColor:
+                Colors.white, // Background color of the date picker dialog
+          ),
+          child: child!,
+        );
+      },
     );
+
     if (picked != null) {
       _dobController.text = '${picked.year}-${picked.month}-${picked.day}';
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
